@@ -53,7 +53,7 @@ async function callGemini(history: Msg[], message: string) {
   if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
 
   // modelはまず “flash-lite系” に寄せる（最安志向）。後で好みで変更OK
-  const model = "gemini-3-flash-lite"; // もし存在しないと言われたら、そのログを貼って。すぐ直す。
+  const model = "gemini-2.5-flash-lite"; // もし存在しないと言われたら、そのログを貼って。すぐ直す。
 
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
