@@ -51,9 +51,6 @@ export default function Page() {
   const [showDevJson, setShowDevJson] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // スマホ用ビュー切替
-  const [activeView, setActiveView] = useState<"chat" | "insights">("chat");
-
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
 const menuItemStyle: React.CSSProperties = {
@@ -378,7 +375,6 @@ const menuItemStyle: React.CSSProperties = {
 
       <main style={styles.main}>
         {/* Chat */}
-        {(activeView === "chat" || window.innerWidth > 900) && (
         <section style={styles.chatCard}>
           <div style={styles.cardTitleRow}>
             <div style={styles.cardTitle}>💬 {conv.title}</div>
@@ -452,10 +448,9 @@ const menuItemStyle: React.CSSProperties = {
             </div>
           </div>
         </section>
-        )}
+        
 
         {/* Insights */}
-        {(activeView === "insights" || window.innerWidth > 900) && (
         <aside style={styles.insightsCard}>
           <div style={styles.cardTitleRow}>
             <div style={styles.cardTitle}>🧩 Insights</div>
@@ -488,7 +483,7 @@ const menuItemStyle: React.CSSProperties = {
             )}
           </div>
         </aside>
-      )}
+      
       </main>
     </div>
   );
