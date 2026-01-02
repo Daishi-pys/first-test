@@ -23,10 +23,7 @@ type Conversation = {
   insights?: Insights;
 };
 
-type IndexItem = { id: string; updatedAt: number; title: string };
-
-const LS_INDEX = "coach_index_v1"; // conversation list
-const LS_CONV_PREFIX = "coach_conv_v1:"; // coach_conv_v1:<id>
+const LS_KEY = "coach_single_conv_v1";
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -39,78 +36,54 @@ function formatTime(ts: number) {
 }
 function guessTitle(messages: Msg[]) {
   const firstUser = messages.find(m => m.role === "user")?.content?.trim();
-  if (!firstUser) return "新しい会話";
+  if (!firstUser) return "対話";
   return firstUser.slice(0, 16) + (firstUser.length > 16 ? "…" : "");
-}
-
-function safeJsonParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
 }
 
 export default function Page() {
   const [conv, setConv] = useState<Conversation | null>(null);
-  const [index, setIndex] = useState<IndexItem[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [showDevJson, setShowDevJson] = useState(false);
 
-  // mobile drawer
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // hamburger menu
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // dev json toggle (optional)
+  const [showDevJson, setShowDevJson] = useState(false);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  // --- load index + latest conversation
+  // load conversation from localStorage (context保存)
   useEffect(() => {
-    const load = () => {
-      const idx = safeJsonParse<IndexItem[]>(localStorage.getItem(LS_INDEX), []);
-      idx.sort((a, b) => b.updatedAt - a.updatedAt);
-      setIndex(idx);
-
-      const latest = idx[0];
-      if (latest?.id) {
-        const raw = localStorage.getItem(LS_CONV_PREFIX + latest.id);
-        if (raw) {
-          setConv(JSON.parse(raw));
-          return;
-        }
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        setConv(JSON.parse(raw));
+        return;
       }
-      // create new
-      const now = Date.now();
-      const id = uid();
-      const created: Conversation = { id, title: "新しい会話", createdAt: now, updatedAt: now, messages: [] };
-      setConv(created);
-    };
+    } catch {}
 
-    load();
+    const now = Date.now();
+    const created: Conversation = {
+      id: uid(),
+      title: "対話",
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+    setConv(created);
   }, []);
 
-  // --- persist conversation + refresh index
+  // persist conversation
   useEffect(() => {
     if (!conv) return;
     try {
-      localStorage.setItem(LS_CONV_PREFIX + conv.id, JSON.stringify(conv));
-
-      const rawIndex = localStorage.getItem(LS_INDEX);
-      const idx: IndexItem[] = rawIndex ? JSON.parse(rawIndex) : [];
-
-      const next: IndexItem[] = [
-        { id: conv.id, updatedAt: conv.updatedAt, title: conv.title },
-        ...idx.filter(x => x.id !== conv.id),
-      ].slice(0, 100);
-
-      localStorage.setItem(LS_INDEX, JSON.stringify(next));
-      next.sort((a, b) => b.updatedAt - a.updatedAt);
-      setIndex(next);
+      localStorage.setItem(LS_KEY, JSON.stringify(conv));
     } catch {}
   }, [conv]);
 
-  // auto-scroll on new messages
+  // auto-scroll
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -120,7 +93,7 @@ export default function Page() {
   const messages = conv?.messages ?? [];
   const insights = conv?.insights;
 
-  // --- lightweight insights (today: heuristic)
+  // 今日の段階：insightsは仮生成（後でAI抽出に差し替え）
   const heuristicInsights = useMemo<Insights>(() => {
     const userTexts = messages.filter(m => m.role === "user").map(m => m.content);
     const lastUser = userTexts[userTexts.length - 1] ?? "";
@@ -135,45 +108,22 @@ export default function Page() {
     return { summary, direction, nextSteps, questions, confidence: userTexts.length ? 0.2 : 0.0, updatedAt: Date.now() };
   }, [messages]);
 
-  function loadConversation(id: string) {
-    const raw = localStorage.getItem(LS_CONV_PREFIX + id);
-    if (!raw) return;
-    try {
-      setConv(JSON.parse(raw));
-      setErr(null);
-      setText("");
-      setDrawerOpen(false);
-    } catch {}
-  }
-
-  function newConversation() {
-    const now = Date.now();
-    const id = uid();
-    const created: Conversation = { id, title: "新しい会話", createdAt: now, updatedAt: now, messages: [] };
-    setConv(created);
-    setErr(null);
-    setText("");
-    setDrawerOpen(false);
-  }
-
-  function deleteConversation(id: string) {
-    const ok = confirm("この会話を削除しますか？（ブラウザ内保存も削除）");
+  function resetConversation() {
+    const ok = confirm("今の対話をリセットしますか？（ブラウザ内の保存も上書きされます）");
     if (!ok) return;
-    try {
-      localStorage.removeItem(LS_CONV_PREFIX + id);
-      const idx = safeJsonParse<IndexItem[]>(localStorage.getItem(LS_INDEX), []);
-      const next = idx.filter(x => x.id !== id);
-      localStorage.setItem(LS_INDEX, JSON.stringify(next));
-      next.sort((a, b) => b.updatedAt - a.updatedAt);
-      setIndex(next);
 
-      // if current deleted -> open latest or new
-      if (conv?.id === id) {
-        const latest = next[0];
-        if (latest?.id) loadConversation(latest.id);
-        else newConversation();
-      }
-    } catch {}
+    const now = Date.now();
+    const next: Conversation = {
+      id: uid(),
+      title: "対話",
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+    setConv(next);
+    setText("");
+    setErr(null);
+    setMenuOpen(false);
   }
 
   function applyHeuristicInsights() {
@@ -181,9 +131,10 @@ export default function Page() {
     setConv(prev => (prev ? { ...prev, insights: heuristicInsights, updatedAt: Date.now() } : prev));
   }
 
+  // 今はUI完成優先：AI抽出は明日ここを実装（API叩く）
   async function updateInsightsAI() {
-    // today: keep UI only
     applyHeuristicInsights();
+    setMenuOpen(false);
   }
 
   async function send() {
@@ -212,6 +163,7 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: t,
+          // ブラウザに保存されている直近の文脈を送る（後で改善）
           history: messages.slice(-20).map(m => ({ role: m.role, content: m.content })),
         }),
       });
@@ -234,32 +186,31 @@ export default function Page() {
 
   return (
     <div style={styles.page}>
-      {/* responsive CSS */}
       <style>{css}</style>
 
       <header style={styles.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
-            onClick={() => setDrawerOpen(v => !v)}
+            onClick={() => setMenuOpen(true)}
             style={styles.iconBtn}
             aria-label="menu"
-            title="会話一覧"
+            title="メニュー"
           >
             ≡
           </button>
+
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
               <div style={styles.brand}>Coaching</div>
               <div style={styles.sub}>UI/UX day</div>
             </div>
             <div style={styles.sub2}>
-              会話: <b>{conv.title}</b> / <span style={{ color: "#666" }}><code>{conv.id}</code></span>
+              <b>{conv.title}</b> <span style={{ color: "#666" }}>(id: <code>{conv.id}</code>)</span>
             </div>
           </div>
         </div>
 
         <div style={styles.headerActions}>
-          <button onClick={newConversation} style={styles.btnSecondary}>＋ 新しい会話</button>
           <a href="/booking" style={styles.linkBtn}>面談予約</a>
           <button onClick={() => setShowDevJson(v => !v)} style={styles.btnSecondary}>
             {showDevJson ? "開発JSONを隠す" : "開発JSONを見る"}
@@ -267,55 +218,53 @@ export default function Page() {
         </div>
       </header>
 
-      {/* drawer (mobile & desktop) */}
-      <div className={`drawerBackdrop ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen(false)} />
-      <aside className={`drawer ${drawerOpen ? "open" : ""}`}>
+      {/* Backdrop */}
+      <div
+        className={`drawerBackdrop ${menuOpen ? "open" : ""}`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      {/* Drawer */}
+      <aside className={`drawer ${menuOpen ? "open" : ""}`}>
         <div style={styles.drawerHeader}>
-          <div style={{ fontWeight: 800 }}>会話一覧</div>
-          <button onClick={() => setDrawerOpen(false)} style={styles.iconBtn} aria-label="close">✕</button>
+          <div style={{ fontWeight: 900 }}>メニュー</div>
+          <button onClick={() => setMenuOpen(false)} style={styles.iconBtn} aria-label="close">
+            ✕
+          </button>
         </div>
 
         <div style={styles.drawerBody}>
-          <button onClick={newConversation} style={{ ...styles.btnSecondary, width: "100%" }}>
-            ＋ 新しい会話
+          <button onClick={resetConversation} style={menuItemStyle}>
+            🔄 リセット
           </button>
 
-          <div style={{ marginTop: 12, fontSize: 12, color: "#666" }}>
-            最新順（ブラウザ保存）
-          </div>
+          <button
+            onClick={() => {
+              applyHeuristicInsights();
+              setMenuOpen(false);
+            }}
+            style={menuItemStyle}
+          >
+            🧩 仮Insights生成
+          </button>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-            {index.length === 0 && <div style={styles.smallMuted}>まだ会話がありません</div>}
+          <button onClick={updateInsightsAI} style={menuItemStyle}>
+            🤖 Insights更新（明日AIに差し替え）
+          </button>
 
-            {index.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  ...styles.convRow,
-                  ...(item.id === conv.id ? styles.convRowActive : {}),
-                }}
-              >
-                <button
-                  onClick={() => loadConversation(item.id)}
-                  style={styles.convRowMain}
-                  title={item.title}
-                >
-                  <div style={{ fontWeight: 700, textAlign: "left" }}>{item.title || "（無題）"}</div>
-                  <div style={styles.smallMuted}>
-                    {new Date(item.updatedAt).toLocaleString()}
-                  </div>
-                </button>
+          <button
+            onClick={() => {
+              alert("設定は後で追加（ここに入る）");
+              setMenuOpen(false);
+            }}
+            style={menuItemStyle}
+          >
+            ⚙ 設定（後で）
+          </button>
 
-                <button
-                  onClick={() => deleteConversation(item.id)}
-                  style={styles.convRowDel}
-                  aria-label="delete"
-                  title="削除"
-                >
-                  🗑
-                </button>
-              </div>
-            ))}
+          <div style={{ marginTop: 12, fontSize: 12, color: "#666", lineHeight: 1.5 }}>
+            ※ 今日はUIを整える日。<br />
+            文脈（会話）はブラウザ内に保存されます。
           </div>
         </div>
       </aside>
@@ -330,7 +279,9 @@ export default function Page() {
 
           <div ref={scrollerRef} style={styles.messages}>
             {messages.length === 0 && (
-              <div style={styles.empty}>まずは今の迷い・モヤモヤをそのまま書いてください。</div>
+              <div style={styles.empty}>
+                まずは今の迷い・モヤモヤをそのまま書いてください。
+              </div>
             )}
 
             {messages.map((m) => (
@@ -379,7 +330,7 @@ export default function Page() {
             />
             <div style={styles.composerBottom}>
               <div style={styles.smallMuted}>
-                {err ? <span style={{ color: "#b42318" }}>{err}</span> : "コンテキストはブラウザ内に保存（今日は外部ログ保存しない）"}
+                {err ? <span style={{ color: "#b42318" }}>{err}</span> : "コンテキストはブラウザ内に保存（外部ログ保存は明日）"}
               </div>
               <button onClick={send} disabled={loading || !text.trim()} style={styles.btnPrimary}>
                 {loading ? "送信中…" : "送信"}
@@ -394,7 +345,7 @@ export default function Page() {
             <div style={styles.cardTitle}>🧩 Insights</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
               <button onClick={updateInsightsAI} style={styles.btnSecondary}>Insights更新</button>
-              <button onClick={applyHeuristicInsights} style={styles.btnSecondary}>仮Insights生成</button>
+              <button onClick={applyHeuristicInsights} style={styles.btnSecondary}>仮生成</button>
             </div>
           </div>
 
@@ -410,7 +361,7 @@ export default function Page() {
 
             {showDevJson && (
               <details style={styles.details} open>
-                <summary style={styles.summary}>開発用JSON（将来はダッシュボード設計で置き換え）</summary>
+                <summary style={styles.summary}>開発用JSON（後でUIから隠してOK）</summary>
                 <pre style={styles.pre}>
 {JSON.stringify({ conversation: { ...conv, insights: undefined }, insights: insights ?? null }, null, 2)}
                 </pre>
@@ -445,7 +396,7 @@ function ListCard({ label, items }: { label: string; items: string[] }) {
 }
 
 const css = `
-/* responsive grid: desktop = 2 columns, mobile = 1 column */
+/* desktop: 2 columns / mobile: 1 column */
 .mainGrid {
   flex: 1;
   display: grid;
@@ -489,6 +440,16 @@ const css = `
 .drawer.open { transform: translateX(0); }
 `;
 
+const menuItemStyle: React.CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: "1px solid #ddd",
+  background: "#fff",
+  cursor: "pointer",
+  textAlign: "left",
+  fontWeight: 800,
+};
+
 const styles: Record<string, React.CSSProperties> = {
   page: { height: "100vh", display: "flex", flexDirection: "column", background: "#fff", color: "#111" },
 
@@ -500,7 +461,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 12,
   },
-  brand: { fontWeight: 900, fontSize: 18 },
+  brand: { fontWeight: 950, fontSize: 18 },
   sub: { fontSize: 12, color: "#666" },
   sub2: { fontSize: 12, color: "#666", marginTop: 4 },
   headerActions: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" },
@@ -511,7 +472,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #ddd",
     background: "#fff",
     cursor: "pointer",
-    fontWeight: 800,
+    fontWeight: 900,
     lineHeight: 1,
   },
 
@@ -527,7 +488,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     background: "#fafafa",
   },
-  cardTitle: { fontWeight: 800 },
+  cardTitle: { fontWeight: 900 },
 
   messages: { flex: 1, overflow: "auto", padding: 12, background: "#fff" },
   empty: { color: "#666", padding: 12, border: "1px dashed #ddd", borderRadius: 12, background: "#fcfcfc" },
@@ -540,24 +501,22 @@ const styles: Record<string, React.CSSProperties> = {
   composer: { borderTop: "1px solid #f0f0f0", padding: 12, background: "#fafafa" },
   textarea: { width: "100%", resize: "none", borderRadius: 12, border: "1px solid #ddd", padding: 10, fontSize: 14, outline: "none", boxSizing: "border-box" },
   composerBottom: { marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 },
+  smallMuted: { fontSize: 12, color: "#666" },
 
   insightsBody: { padding: 12, overflow: "auto" },
   kv: { marginBottom: 14 },
-  kvLabel: { fontSize: 12, color: "#666", marginBottom: 6, fontWeight: 700 },
+  kvLabel: { fontSize: 12, color: "#666", marginBottom: 6, fontWeight: 800 },
   kvValue: { fontSize: 14, lineHeight: 1.4 },
   ul: { margin: 0, paddingLeft: 18 },
   li: { marginBottom: 6, lineHeight: 1.4 },
 
   details: { marginTop: 10, borderTop: "1px solid #eee", paddingTop: 10 },
-  summary: { cursor: "pointer", fontWeight: 700 },
+  summary: { cursor: "pointer", fontWeight: 800 },
   pre: { marginTop: 10, background: "#111", color: "#eee", padding: 12, borderRadius: 12, overflow: "auto", fontSize: 12 },
 
-  smallMuted: { fontSize: 12, color: "#666" },
-
-  btnPrimary: { padding: "10px 14px", borderRadius: 12, border: "1px solid #111", background: "#111", color: "#fff", cursor: "pointer", fontWeight: 700 },
-  btnSecondary: { padding: "8px 10px", borderRadius: 12, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontWeight: 700 },
-  btnDanger: { padding: "8px 10px", borderRadius: 12, border: "1px solid #f2c6c6", background: "#fff5f5", cursor: "pointer", fontWeight: 700, color: "#b42318" },
-  linkBtn: { padding: "8px 10px", borderRadius: 12, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontWeight: 700, textDecoration: "none", color: "#111", display: "inline-block" },
+  btnPrimary: { padding: "10px 14px", borderRadius: 12, border: "1px solid #111", background: "#111", color: "#fff", cursor: "pointer", fontWeight: 900 },
+  btnSecondary: { padding: "8px 10px", borderRadius: 12, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontWeight: 800 },
+  linkBtn: { padding: "8px 10px", borderRadius: 12, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontWeight: 900, textDecoration: "none", color: "#111", display: "inline-block" },
 
   drawerHeader: {
     padding: 12,
@@ -568,33 +527,5 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
     background: "#fafafa",
   },
-  drawerBody: { padding: 12, overflow: "auto" },
-
-  convRow: {
-    display: "flex",
-    alignItems: "stretch",
-    border: "1px solid #e6e6e6",
-    borderRadius: 12,
-    overflow: "hidden",
-    background: "#fff",
-  },
-  convRowActive: { borderColor: "#111" },
-  convRowMain: {
-    flex: 1,
-    padding: 10,
-    background: "#fff",
-    border: "none",
-    cursor: "pointer",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  },
-  convRowDel: {
-    width: 44,
-    border: "none",
-    borderLeft: "1px solid #eee",
-    background: "#fff",
-    cursor: "pointer",
-    fontSize: 16,
-  },
+  drawerBody: { padding: 12, overflow: "auto", display: "flex", flexDirection: "column", gap: 8 },
 };
