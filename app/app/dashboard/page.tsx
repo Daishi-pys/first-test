@@ -51,6 +51,7 @@ export default function Page() {
   const [showDevJson, setShowDevJson] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   // --- load or create conversation on mount
@@ -238,6 +239,21 @@ export default function Page() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
+        <button
+  onClick={() => setMenuOpen(true)}
+  style={{
+    padding: "8px 10px",
+    borderRadius: 10,
+    border: "1px solid #ddd",
+    background: "#fff",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+  aria-label="menu"
+>
+  ≡
+</button>
+
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <div style={styles.brand}>Coaching</div>
@@ -247,7 +263,7 @@ export default function Page() {
         </div>
 
         <div style={styles.headerActions}>
-          <button style={styles.iconBtn} onClick={() => setMenuOpen(true)}>≡</button>
+          <button onClick={newConversation} style={styles.btnSecondary}>＋ 新しい会話</button>
           <a href="/booking" style={styles.linkBtn}>面談予約</a>
           <button onClick={() => setShowDevJson(v => !v)} style={styles.btnSecondary}>
             {showDevJson ? "開発JSONを隠す" : "開発JSONを見る"}
@@ -366,7 +382,76 @@ export default function Page() {
           </div>
         </aside>
       </main>
+      {/* Hamburger Menu Backdrop */}
+{menuOpen && (
+  <div
+    onClick={() => setMenuOpen(false)}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.35)",
+      zIndex: 40,
+    }}
+  />
+)}
+
+{/* Hamburger Menu Drawer */}
+<div
+  style={{
+    position: "fixed",
+    top: 0,
+    right: 0,
+    height: "100vh",
+    width: 280,
+    background: "#fff",
+    borderLeft: "1px solid #e6e6e6",
+    zIndex: 50,
+    transform: menuOpen ? "translateX(0)" : "translateX(100%)",
+    transition: "transform 0.2s ease",
+    display: "flex",
+    flexDirection: "column",
+  }}
+>
+  <div
+    style={{
+      padding: 12,
+      borderBottom: "1px solid #eee",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      background: "#fafafa",
+    }}
+  >
+    <div style={{ fontWeight: 700 }}>メニュー</div>
+    <button
+      onClick={() => setMenuOpen(false)}
+      style={{
+        border: "none",
+        background: "transparent",
+        fontSize: 18,
+        cursor: "pointer",
+      }}
+    >
+      ✕
+    </button>
+  </div>
+
+  <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+    <button style={styles.btnSecondary} onClick={() => alert("設定は後で実装")}>
+      ⚙ 設定
+    </button>
+    <button style={styles.btnSecondary} onClick={() => alert("ビュー切替は後で実装")}>
+      🧭 ビュー切替
+    </button>
+    <button style={styles.btnDanger} onClick={clearConversation}>
+      🗑 この会話を削除
+    </button>
+  </div>
+</div>
+
     </div>
+
+    
   );
 }
 
