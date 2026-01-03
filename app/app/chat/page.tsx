@@ -183,6 +183,17 @@ export default function ChatPage() {
 
           <button
             style={styles.menuItem}
+            onClick={() => {
+              window.location.href = "/booking";
+              setMenuOpen(false);
+            }}
+          >
+            📅 面談予約
+          </button>
+
+
+          <button
+            style={styles.menuItem}
             onClick={() => { alert("設定は後で追加"); setMenuOpen(false); }}
           >
             ⚙ 設定（後で）
