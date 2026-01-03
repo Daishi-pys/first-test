@@ -240,19 +240,19 @@ export default function Page() {
     <div style={styles.page}>
       <header style={styles.header}>
         <button
-  onClick={() => setMenuOpen(true)}
-  style={{
-    padding: "8px 10px",
-    borderRadius: 10,
-    border: "1px solid #ddd",
-    background: "#fff",
-    fontWeight: 700,
-    cursor: "pointer",
-  }}
-  aria-label="menu"
->
-  ≡
-</button>
+          onClick={() => setMenuOpen(true)}
+          style={{
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid #ddd",
+            background: "#fff",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+          aria-label="menu"
+        >
+          ≡
+        </button>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
