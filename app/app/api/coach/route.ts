@@ -91,8 +91,8 @@ async function callGemini(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
 
-  const model = opts?.model ?? "gemini-2.5-flash-lite";
-  //const model = opts?.model ?? "gemini-2.5-pro";
+  //const model = opts?.model ?? "gemini-2.5-flash-lite";
+  const model = opts?.model ?? "gemini-2.5-pro";
   //const temperature = opts?.temperature ?? 0.5;
   //const maxOutputTokens = opts?.maxOutputTokens ?? 350; // コーチ返答を短めに固定
 
